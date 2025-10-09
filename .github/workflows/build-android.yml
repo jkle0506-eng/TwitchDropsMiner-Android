@@ -18,14 +18,19 @@ jobs:
       with:
         python-version: '3.10'
 
-    # 1) GIT MUSÍ BYŤ NAINŠTALOVANÝ EŠTE PRED BUILDOZEROM
-    - name: Ensure Git is installed
+    # 1) Git – nainštaluj a over
+    - name: Install Git explicitly
+      shell: bash
       run: |
+        set -e
         sudo apt-get update
         sudo apt-get install -y git
-        git --version
+        which git || true
+        git --version || true
+        ls -l /usr/bin/git || true
+        echo "/usr/bin" >> $GITHUB_PATH
 
-    # 2) ZÁKLADNÉ BALÍKY (bez gitu, už je vyššie)
+    # 2) Základné balíky (bez gitu, už je vyššie)
     - name: Install system dependencies
       run: |
         sudo apt-get install -y python3-pip build-essential ffmpeg \
@@ -39,7 +44,7 @@ jobs:
         pip3 install --upgrade pip
         pip3 install buildozer cython
 
-    # 3) LOKÁLNY ANDROID SDK PRE BUILDOZER
+    # 3) Lokálny Android SDK pre Buildozer
     - name: Prepare local Android SDK for Buildozer
       shell: bash
       run: |
@@ -74,15 +79,14 @@ jobs:
           ~/.buildozer
         key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
 
-    # 4) BUILD
+    # 4) Build – použijeme absolútnu cestu k gitu pre istotu
     - name: Build APK
       env:
         ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
         ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
-        PATH: /home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:/home/runner/.buildozer/android/platform/android-sdk/platform-tools:${PATH}
+        PATH: /usr/bin:/home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:/home/runner/.buildozer/android/platform/android-sdk/platform-tools:${PATH}
       run: |
-        # pre istotu ešte raz over git
-        git --version
+        /usr/bin/git --version
         buildozer -v android debug
 
     - name: Upload APK
