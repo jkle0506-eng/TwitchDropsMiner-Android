@@ -5,6 +5,5 @@ pillow>=9.0.0
 plyer>=2.1.0
 certifi>=2023.7.22
 
-# Android specific
-pyjnius==1.6.1; sys_platform == "linux"
-plyer==2.1.0
+# Android/JNI bindings
+pyjnius>=1.6.1
