@@ -40,8 +40,8 @@ jobs:
       run: |
         pip3 install --upgrade pip
         pip3 install --user buildozer cython
-        python -m buildozer --version || true
         echo "$HOME/.local/bin" >> $GITHUB_PATH
+        python -m buildozer --version || true
 
     - name: Prepare local Android SDK for Buildozer
       shell: bash
@@ -59,6 +59,7 @@ jobs:
         export ANDROID_HOME="${LOCAL_SDK}"
         echo "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin" >> $GITHUB_PATH
         echo "${ANDROID_SDK_ROOT}/platform-tools" >> $GITHUB_PATH
+
         yes | "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" --licenses || true
         "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" \
           "platform-tools" \
@@ -74,12 +75,26 @@ jobs:
         key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
 
     - name: Build APK
+      shell: bash
       env:
         ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
         ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
         PATH: /usr/bin:/home/runner/.local/bin:/home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:/home/runner/.buildozer/android/platform/android-sdk/platform-tools:${PATH}
       run: |
-        git --version
+        set -e
+        echo "Git:" && git --version
+        echo "sdkmanager at:" && which sdkmanager || true
+
+        # Workaround: Buildozer/p4a hľadá starú cestu tools/bin/sdkmanager -> vytvoríme symlink
+        mkdir -p "${ANDROID_SDK_ROOT}/tools/bin"
+        if [ ! -e "${ANDROID_SDK_ROOT}/tools/bin/sdkmanager" ]; then
+          ln -s "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" "${ANDROID_SDK_ROOT}/tools/bin/sdkmanager"
+        fi
+
+        # Overíme, že symlink funguje
+        "${ANDROID_SDK_ROOT}/tools/bin/sdkmanager" --version || true
+
+        # Spustíme build cez python -m (istota, že buildozer je nájdený)
         python -m buildozer -v android debug
 
     - name: Upload APK
