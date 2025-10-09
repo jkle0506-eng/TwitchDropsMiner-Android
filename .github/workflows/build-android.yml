@@ -32,45 +32,35 @@ jobs:
         pip3 install --upgrade pip
         pip3 install buildozer cython
 
-    # System SDK: optional but helps cache tools
-    - name: Install Android SDK build-tools and platform-tools (system SDK)
-      env:
-        ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-      run: |
-        yes | ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --licenses || true
-        ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager \
-          "platform-tools" \
-          "build-tools;36.1.0" \
-          "platforms;android-33"
-        echo "${ANDROID_SDK_ROOT}/build-tools/36.1.0" >> $GITHUB_PATH
-        echo "${ANDROID_SDK_ROOT}/platform-tools" >> $GITHUB_PATH
-
-    # Buildozer používa vlastnú kópiu SDK v ~/.buildozer, tu prijmeme licencie a doinštalujeme build-tools
-    - name: Accept Android licenses for Buildozer SDK (local) and install tools
+    # Priprav lokálny ANDROID SDK, ktorý používa Buildozer (~/.buildozer/android/platform/android-sdk)
+    - name: Prepare local Android SDK for Buildozer
       shell: bash
       run: |
         set -e
-        mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin
-        if [ ! -x ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager ]; then
-          echo "Downloading cmdline-tools for Buildozer local SDK..."
+        export LOCAL_SDK="${HOME}/.buildozer/android/platform/android-sdk"
+        mkdir -p "${LOCAL_SDK}/cmdline-tools/latest"
+        if [ ! -x "${LOCAL_SDK}/cmdline-tools/latest/bin/sdkmanager" ]; then
+          echo "Downloading Android cmdline-tools into Buildozer local SDK..."
           cd /tmp
           curl -sSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o clt.zip
           unzip -q clt.zip
-          mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest
-          mv cmdline-tools/* ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/ || true
+          # V archíve je priečinok 'cmdline-tools' -> presuň jeho obsah do 'latest'
+          mv cmdline-tools/* "${LOCAL_SDK}/cmdline-tools/latest"/
         fi
 
-        export ANDROID_SDK_ROOT="${HOME}/.buildozer/android/platform/android-sdk"
-        export ANDROID_HOME="${ANDROID_SDK_ROOT}"
+        export ANDROID_SDK_ROOT="${LOCAL_SDK}"
+        export ANDROID_HOME="${LOCAL_SDK}"
 
+        # Pridaj cmdline-tools a platform-tools do PATH pre ďalšie kroky
+        echo "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin" >> $GITHUB_PATH
+        echo "${ANDROID_SDK_ROOT}/platform-tools" >> $GITHUB_PATH
+
+        # Akceptuj licencie a nainštaluj potrebné balíky
         yes | "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" --licenses || true
         "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" \
           "platform-tools" \
           "build-tools;36.1.0" \
           "platforms;android-33"
-
-        echo "${ANDROID_SDK_ROOT}/build-tools/36.1.0" >> $GITHUB_PATH
-        echo "${ANDROID_SDK_ROOT}/platform-tools" >> $GITHUB_PATH
 
     - name: Cache Buildozer
       uses: actions/cache@v4
@@ -84,6 +74,7 @@ jobs:
       env:
         ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
         ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
+        PATH: /home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:/home/runner/.buildozer/android/platform/android-sdk/platform-tools:${PATH}
       run: |
         buildozer -v android debug
 
