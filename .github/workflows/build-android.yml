@@ -18,33 +18,31 @@ jobs:
       with:
         python-version: '3.10'
 
-    # 1) Git – nainštaluj a over
     - name: Install Git explicitly
       shell: bash
       run: |
         set -e
         sudo apt-get update
         sudo apt-get install -y git
-        which git || true
-        git --version || true
-        ls -l /usr/bin/git || true
-        echo "/usr/bin" >> $GITHUB_PATH
+        git --version
 
-    # 2) Základné balíky (bez gitu, už je vyššie)
     - name: Install system dependencies
+      env:
+        DEBIAN_FRONTEND: noninteractive
       run: |
-        sudo apt-get install -y python3-pip build-essential ffmpeg \
+        sudo apt-get install -y --no-install-recommends python3-pip build-essential ffmpeg \
           libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
           libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
           zlib1g-dev libgstreamer1.0 gstreamer1.0-plugins-base \
-          gstreamer1.0-plugins-good openjdk-17-jdk unzip zip curl
+          gstreamer1.0-plugins-good openjdk-17-jdk unzip zip curl ca-certificates
 
     - name: Install Buildozer
       run: |
         pip3 install --upgrade pip
-        pip3 install buildozer cython
+        pip3 install --user buildozer cython
+        python -m buildozer --version || true
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-    # 3) Lokálny Android SDK pre Buildozer
     - name: Prepare local Android SDK for Buildozer
       shell: bash
       run: |
@@ -52,19 +50,15 @@ jobs:
         export LOCAL_SDK="${HOME}/.buildozer/android/platform/android-sdk"
         mkdir -p "${LOCAL_SDK}/cmdline-tools/latest"
         if [ ! -x "${LOCAL_SDK}/cmdline-tools/latest/bin/sdkmanager" ]; then
-          echo "Downloading Android cmdline-tools into Buildozer local SDK..."
           cd /tmp
           curl -sSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o clt.zip
           unzip -q clt.zip
           mv cmdline-tools/* "${LOCAL_SDK}/cmdline-tools/latest"/
         fi
-
         export ANDROID_SDK_ROOT="${LOCAL_SDK}"
         export ANDROID_HOME="${LOCAL_SDK}"
-
         echo "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin" >> $GITHUB_PATH
         echo "${ANDROID_SDK_ROOT}/platform-tools" >> $GITHUB_PATH
-
         yes | "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" --licenses || true
         "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" \
           "platform-tools" \
@@ -79,15 +73,14 @@ jobs:
           ~/.buildozer
         key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
 
-    # 4) Build – použijeme absolútnu cestu k gitu pre istotu
     - name: Build APK
       env:
         ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
         ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
-        PATH: /usr/bin:/home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:/home/runner/.buildozer/android/platform/android-sdk/platform-tools:${PATH}
+        PATH: /usr/bin:/home/runner/.local/bin:/home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:/home/runner/.buildozer/android/platform/android-sdk/platform-tools:${PATH}
       run: |
-        /usr/bin/git --version
-        buildozer -v android debug
+        git --version
+        python -m buildozer -v android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
