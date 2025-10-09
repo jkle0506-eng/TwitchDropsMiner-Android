@@ -25,14 +25,15 @@ jobs:
           libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
           libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
           zlib1g-dev libgstreamer1.0 gstreamer1.0-plugins-base \
-          gstreamer1.0-plugins-good openjdk-17-jdk unzip zip
+          gstreamer1.0-plugins-good openjdk-17-jdk unzip zip curl
 
     - name: Install Buildozer
       run: |
         pip3 install --upgrade pip
         pip3 install buildozer cython
 
-    - name: Install Android SDK build-tools and platform-tools
+    # System SDK: optional but helps cache tools
+    - name: Install Android SDK build-tools and platform-tools (system SDK)
       env:
         ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
       run: |
@@ -44,8 +45,32 @@ jobs:
         echo "${ANDROID_SDK_ROOT}/build-tools/36.1.0" >> $GITHUB_PATH
         echo "${ANDROID_SDK_ROOT}/platform-tools" >> $GITHUB_PATH
 
-    - name: Accept Android licenses (fallback)
-      run: yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
+    # Buildozer používa vlastnú kópiu SDK v ~/.buildozer, tu prijmeme licencie a doinštalujeme build-tools
+    - name: Accept Android licenses for Buildozer SDK (local) and install tools
+      shell: bash
+      run: |
+        set -e
+        mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin
+        if [ ! -x ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager ]; then
+          echo "Downloading cmdline-tools for Buildozer local SDK..."
+          cd /tmp
+          curl -sSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o clt.zip
+          unzip -q clt.zip
+          mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest
+          mv cmdline-tools/* ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/ || true
+        fi
+
+        export ANDROID_SDK_ROOT="${HOME}/.buildozer/android/platform/android-sdk"
+        export ANDROID_HOME="${ANDROID_SDK_ROOT}"
+
+        yes | "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+        "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" \
+          "platform-tools" \
+          "build-tools;36.1.0" \
+          "platforms;android-33"
+
+        echo "${ANDROID_SDK_ROOT}/build-tools/36.1.0" >> $GITHUB_PATH
+        echo "${ANDROID_SDK_ROOT}/platform-tools" >> $GITHUB_PATH
 
     - name: Cache Buildozer
       uses: actions/cache@v4
@@ -57,9 +82,10 @@ jobs:
 
     - name: Build APK
       env:
-        ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-        ANDROID_HOME: /usr/local/lib/android/sdk
-      run: buildozer -v android debug
+        ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
+        ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
+      run: |
+        buildozer -v android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
