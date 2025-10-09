@@ -1,0 +1,9 @@
+# Core dependencies
+kivy==2.3.0
+kivymd==1.2.0
+aiohttp==3.9.5
+Pillow==10.3.0
+
+# Android specific
+pyjnius==1.6.1; sys_platform == "linux"
+plyer==2.1.0
