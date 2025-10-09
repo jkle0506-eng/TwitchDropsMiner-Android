@@ -20,11 +20,3 @@ android.archs = arm64-v8a
 [buildozer]
 log_level = 2
 warn_on_root = 1
-
-A k tomu requirements.txt:
-
-kivy==2.2.1
-requests>=2.28.0
-pillow>=9.0.0
-plyer>=2.1.0
-certifi>=2023.7.22
