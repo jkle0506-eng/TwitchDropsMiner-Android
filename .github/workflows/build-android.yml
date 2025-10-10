@@ -80,10 +80,11 @@ jobs:
 
     - name: Clean old p4a if switching branches
       run: |
-        # Vyčistíme p4a, aby stiahol master branch
         rm -rf .buildozer/android/platform/python-for-android || true
 
-    - name: Build APK
+    - name: Build APK (allow failure to debug)
+      continue-on-error: true
+      id: build_attempt
       shell: bash
       env:
         ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
@@ -96,17 +97,12 @@ jobs:
         echo "git: $(git --version)"
         echo "cmake: $(cmake --version | head -n1)"
         echo "pkg-config: $(pkg-config --version)"
-        which autoconf && autoconf --version | head -n1
-        which automake && automake --version | head -n1
-        which libtoolize && libtoolize --version | head -n1 || true
 
-        # Workaround pre starú cestu sdkmanager
         mkdir -p "${ANDROID_SDK_ROOT}/tools/bin"
         if [ ! -e "${ANDROID_SDK_ROOT}/tools/bin/sdkmanager" ]; then
           ln -s "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" "${ANDROID_SDK_ROOT}/tools/bin/sdkmanager"
         fi
 
-        # Build (requirements sa berú z buildozer.spec)
         set +e
         python -m buildozer -v android debug 2>&1 | tee p4a_create.log
         status=${PIPESTATUS[0]}
@@ -114,12 +110,36 @@ jobs:
         
         echo "==== tail p4a_create.log ===="
         tail -n 300 p4a_create.log || true
-        echo "==== try tail kivy build log ===="
-        find .buildozer -name "*.log" -path "*/kivy/*" -type f -print -exec tail -n 100 {} \; || true
-        echo "==== check p4a version ===="
-        find .buildozer/android/platform/python-for-android -name "*.py" -path "*/pythonforandroid/__init__.py" -exec head -n 20 {} \; || true
-        echo "=============================="
         exit ${status}
+
+    - name: Debug Kivy build manually
+      if: steps.build_attempt.outcome == 'failure'
+      shell: bash
+      env:
+        ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
+        ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
+        PATH: /usr/bin:/home/runner/.local/bin:/home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:/home/runner/.buildozer/android/platform/android-sdk/platform-tools:${PATH}
+      run: |
+        echo "==== Attempting manual Kivy build to see actual error ===="
+        KIVY_DIR=$(find .buildozer/android/platform/build-arm64-v8a/build/other_builds/kivy -type d -name "kivy" | head -n1)
+        HOSTPYTHON=$(find .buildozer/android/platform/build-arm64-v8a/build/other_builds/hostpython3 -name "python3" -type f | head -n1)
+        
+        if [ -d "$KIVY_DIR" ] && [ -f "$HOSTPYTHON" ]; then
+          echo "Found Kivy dir: $KIVY_DIR"
+          echo "Found hostpython: $HOSTPYTHON"
+          cd "$KIVY_DIR"
+          echo "==== Running setup.py build_ext manually ===="
+          $HOSTPYTHON setup.py build_ext -v 2>&1 | tee /tmp/kivy_manual_build.log || true
+          echo "==== Manual build output ===="
+          cat /tmp/kivy_manual_build.log
+        else
+          echo "Could not find Kivy build dir or hostpython"
+        fi
+        
+        echo "==== All log files in kivy build ===="
+        find .buildozer -path "*/kivy/*" -name "*.log" -type f -exec echo "FILE: {}" \; -exec tail -n 50 {} \; || true
+        
+        exit 1
 
     - name: Upload APK
       if: success()
