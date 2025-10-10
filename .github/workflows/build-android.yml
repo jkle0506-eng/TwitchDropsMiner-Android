@@ -76,7 +76,12 @@ jobs:
         path: |
           .buildozer
           ~/.buildozer
-        key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec', 'requirements.txt') }}
+        key: ${{ runner.os }}-buildozer-p4amaster-${{ hashFiles('buildozer.spec', 'requirements.txt') }}
+
+    - name: Clean old p4a if switching branches
+      run: |
+        # Vyčistíme p4a, aby stiahol master branch
+        rm -rf .buildozer/android/platform/python-for-android || true
 
     - name: Build APK
       shell: bash
@@ -111,6 +116,8 @@ jobs:
         tail -n 300 p4a_create.log || true
         echo "==== try tail kivy build log ===="
         find .buildozer -name "*.log" -path "*/kivy/*" -type f -print -exec tail -n 100 {} \; || true
+        echo "==== check p4a version ===="
+        find .buildozer/android/platform/python-for-android -name "*.py" -path "*/pythonforandroid/__init__.py" -exec head -n 20 {} \; || true
         echo "=============================="
         exit ${status}
 
