@@ -121,8 +121,9 @@ jobs:
         PATH: /usr/bin:/home/runner/.local/bin:/home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:/home/runner/.buildozer/android/platform/android-sdk/platform-tools:${PATH}
       run: |
         echo "==== Searching for Kivy setup.py ===="
-        KIVY_SETUP=$(find .buildozer/android/platform/build-*/build/other_builds/kivy -name "setup.py" -type f 2>/dev/null | head -n1)
-        HOSTPYTHON=$(find .buildozer/android/platform/build-*/build/other_builds/hostpython3 -name "python3" -type f -executable 2>/dev/null | head -n1)
+        WORKSPACE=$(pwd)
+        KIVY_SETUP=$(find "$WORKSPACE/.buildozer/android/platform/build-"*/build/other_builds/kivy -name "setup.py" -type f 2>/dev/null | head -n1)
+        HOSTPYTHON=$(find "$WORKSPACE/.buildozer/android/platform/build-"*/build/other_builds/hostpython3 -name "python3" -type f -executable 2>/dev/null | head -n1)
         
         echo "Kivy setup.py: $KIVY_SETUP"
         echo "Hostpython: $HOSTPYTHON"
@@ -140,22 +141,23 @@ jobs:
           export USE_SDL2='1'
           export KIVY_SPLIT_EXAMPLES='1'
           
+          # Použijeme absolútnu cestu k hostpython
           set +e
           "$HOSTPYTHON" setup.py build_ext -v 2>&1 | tee /tmp/kivy_manual_build.log
           BUILD_STATUS=$?
           set -e
           
           echo "==== Manual build exit code: $BUILD_STATUS ===="
-          echo "==== Manual build output (last 200 lines) ===="
-          tail -n 200 /tmp/kivy_manual_build.log
+          echo "==== Manual build output (last 300 lines) ===="
+          tail -n 300 /tmp/kivy_manual_build.log
         else
           echo "ERROR: Could not find Kivy setup.py or hostpython"
           echo "==== Directory structure ===="
-          find .buildozer/android/platform/build-* -maxdepth 5 -type d 2>/dev/null | head -n 50
+          find "$WORKSPACE/.buildozer/android/platform/build-"* -maxdepth 5 -type d 2>/dev/null | head -n 50
         fi
         
         echo "==== All log files in build ===="
-        find .buildozer -name "*.log" -type f 2>/dev/null | head -n 20 | while read logfile; do
+        find "$WORKSPACE/.buildozer" -name "*.log" -type f 2>/dev/null | head -n 20 | while read logfile; do
           echo "=== $logfile ==="
           tail -n 30 "$logfile"
         done
