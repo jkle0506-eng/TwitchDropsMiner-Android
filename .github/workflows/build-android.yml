@@ -120,24 +120,45 @@ jobs:
         ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
         PATH: /usr/bin:/home/runner/.local/bin:/home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:/home/runner/.buildozer/android/platform/android-sdk/platform-tools:${PATH}
       run: |
-        echo "==== Attempting manual Kivy build to see actual error ===="
-        KIVY_DIR=$(find .buildozer/android/platform/build-arm64-v8a/build/other_builds/kivy -type d -name "kivy" | head -n1)
-        HOSTPYTHON=$(find .buildozer/android/platform/build-arm64-v8a/build/other_builds/hostpython3 -name "python3" -type f | head -n1)
+        echo "==== Searching for Kivy setup.py ===="
+        KIVY_SETUP=$(find .buildozer/android/platform/build-*/build/other_builds/kivy -name "setup.py" -type f 2>/dev/null | head -n1)
+        HOSTPYTHON=$(find .buildozer/android/platform/build-*/build/other_builds/hostpython3 -name "python3" -type f -executable 2>/dev/null | head -n1)
         
-        if [ -d "$KIVY_DIR" ] && [ -f "$HOSTPYTHON" ]; then
+        echo "Kivy setup.py: $KIVY_SETUP"
+        echo "Hostpython: $HOSTPYTHON"
+        
+        if [ -f "$KIVY_SETUP" ] && [ -f "$HOSTPYTHON" ]; then
+          KIVY_DIR=$(dirname "$KIVY_SETUP")
           echo "Found Kivy dir: $KIVY_DIR"
-          echo "Found hostpython: $HOSTPYTHON"
           cd "$KIVY_DIR"
-          echo "==== Running setup.py build_ext manually ===="
-          $HOSTPYTHON setup.py build_ext -v 2>&1 | tee /tmp/kivy_manual_build.log || true
-          echo "==== Manual build output ===="
-          cat /tmp/kivy_manual_build.log
+          
+          echo "==== Kivy directory contents ===="
+          ls -la
+          
+          echo "==== Running setup.py build_ext manually with full env ===="
+          export NDKPLATFORM='NOTNONE'
+          export USE_SDL2='1'
+          export KIVY_SPLIT_EXAMPLES='1'
+          
+          set +e
+          "$HOSTPYTHON" setup.py build_ext -v 2>&1 | tee /tmp/kivy_manual_build.log
+          BUILD_STATUS=$?
+          set -e
+          
+          echo "==== Manual build exit code: $BUILD_STATUS ===="
+          echo "==== Manual build output (last 200 lines) ===="
+          tail -n 200 /tmp/kivy_manual_build.log
         else
-          echo "Could not find Kivy build dir or hostpython"
+          echo "ERROR: Could not find Kivy setup.py or hostpython"
+          echo "==== Directory structure ===="
+          find .buildozer/android/platform/build-* -maxdepth 5 -type d 2>/dev/null | head -n 50
         fi
         
-        echo "==== All log files in kivy build ===="
-        find .buildozer -path "*/kivy/*" -name "*.log" -type f -exec echo "FILE: {}" \; -exec tail -n 50 {} \; || true
+        echo "==== All log files in build ===="
+        find .buildozer -name "*.log" -type f 2>/dev/null | head -n 20 | while read logfile; do
+          echo "=== $logfile ==="
+          tail -n 30 "$logfile"
+        done
         
         exit 1
 
