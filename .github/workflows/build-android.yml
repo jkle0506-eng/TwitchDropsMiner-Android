@@ -31,11 +31,12 @@ jobs:
         DEBIAN_FRONTEND: noninteractive
       run: |
         sudo apt-get install -y --no-install-recommends \
-          python3-pip build-essential cmake ninja-build ffmpeg \
-          libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
+          python3-pip build-essential cmake ninja-build pkg-config \
+          libjpeg-dev libpng-dev libfreetype6-dev libffi-dev \
+          ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
           libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
-          zlib1g-dev libgstreamer1.0 gstreamer1.0-plugins-base \
-          gstreamer1.0-plugins-good openjdk-17-jdk unzip zip curl ca-certificates
+          zlib1g-dev libgstreamer1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+          openjdk-17-jdk unzip zip curl ca-certificates
 
     - name: Install Buildozer
       run: |
@@ -85,12 +86,22 @@ jobs:
         set -e
         git --version
         which cmake && cmake --version
+        which pkg-config && pkg-config --version
+
         # Workaround pre starú cestu sdkmanager
         mkdir -p "${ANDROID_SDK_ROOT}/tools/bin"
         if [ ! -e "${ANDROID_SDK_ROOT}/tools/bin/sdkmanager" ]; then
           ln -s "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" "${ANDROID_SDK_ROOT}/tools/bin/sdkmanager"
         fi
-        python -m buildozer -v android debug
+
+        # Spusti build s extra logmi
+        export P4A_DEBUG=1
+        python -m buildozer -v android debug || {
+          echo "========== Tail of .buildozer log =========="
+          tail -n 200 .buildozer/android/platform/build-arm64-v8a/build.log || true
+          echo "============================================"
+          exit 1
+        }
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
