@@ -11,9 +11,8 @@ source.include_exts = py,png,jpg,kv,atlas,txt
 # Verzovanie
 version = 1.0
 
-# Závislosti (držíme sa stabilných verzií na Android)
-# Pozn.: KivyMD a aiohttp sú vynechané kvôli častým build problémom. Pridáme neskôr, ak ich budeš potrebovať.
-requirements = python3,kivy==2.2.1,requests,pillow,pyjnius,plyer,certifi
+# Závislosti (stabilné verzie pre Android build)
+requirements = python3, kivy==2.2.1, requests, pillow, pyjnius==1.6.1, plyer, certifi
 
 # Orientácia a zobrazenie
 orientation = portrait
@@ -32,27 +31,25 @@ android.private_storage = True
 android.logcat_filters = *:S python:D
 android.copy_libs = 1
 
-# Architektúry (najprv kompilujeme jednu – je rýchlejšie a stabilnejšie)
+# Architektúry (pre rýchlejší a stabilnejší build najprv len 64-bit ARM)
 android.archs = arm64-v8a
 
-# Voliteľné: názov balíka pre Android (ak chceš vlastný app id)
-# package.domain a package.name spolu vytvoria: org.tdm.twitchdropsminer
-
-# Voliteľné: ikona a špliechacia obrazovka (ak budeš mať súbory)
+# Voliteľné: ikona a presplash (ak máš súbory v projekte)
 # icon.filename = assets/icon.png
 # presplash.filename = assets/presplash.png
 
-# Voliteľné: ďalšie optimalizácie
-# android.prevent_scraping = True
+# Voliteľné: ďalšie optimalizácie/kompat nastavenia
 # android.enable_androidx = True
+# android.allow_backup = False
+# android.prevent_scraping = True
 
 [buildozer]
-# Verbózne logy pre ľahšie debugovanie na Actions
+# Verbózne logy pre ľahšie debugovanie na CI
 log_level = 2
 warn_on_root = 1
 
-# Ukladanie logov buildozeru (pomôže pri debugovaní)
+# Ukladanie build artefaktov (necháme default, Buildozer si vytvorí .buildozer)
 # storage_dir = .buildozer
 
-# Voliteľné: force-ovať p4a verziu (zvyčajne netreba)
+# Voliteľné: pin python-for-android vetvu (zvyčajne netreba)
 # p4a.branch = master
