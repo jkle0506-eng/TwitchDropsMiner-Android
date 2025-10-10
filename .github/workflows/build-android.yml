@@ -40,10 +40,10 @@ jobs:
           nasm yasm rsync patchelf ccache \
           openjdk-17-jdk unzip zip curl ca-certificates
 
-    - name: Install Buildozer
+    - name: Install Buildozer (pin Cython)
       run: |
         pip3 install --upgrade pip
-        pip3 install --user buildozer cython
+        pip3 install --user "cython==0.29.36" buildozer
         echo "$HOME/.local/bin" >> $GITHUB_PATH
         python -m buildozer --version || true
 
@@ -75,7 +75,7 @@ jobs:
         path: |
           .buildozer
           ~/.buildozer
-        key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
+        key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec', 'requirements.txt') }}
 
     - name: Build APK
       shell: bash
@@ -88,12 +88,17 @@ jobs:
         echo "git: $(git --version)"
         echo "cmake: $(cmake --version | head -n1)"
         echo "pkg-config: $(pkg-config --version)"
+        which autoconf && autoconf --version | head -n1
+        which automake && automake --version | head -n1
+        which libtoolize && libtoolize --version | head -n1 || true
+
         # Workaround pre starú cestu sdkmanager
         mkdir -p "${ANDROID_SDK_ROOT}/tools/bin"
         if [ ! -e "${ANDROID_SDK_ROOT}/tools/bin/sdkmanager" ]; then
           ln -s "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" "${ANDROID_SDK_ROOT}/tools/bin/sdkmanager"
         fi
-        # Spusti build a ulož výstup
+
+        # Build (requirements sa berú z buildozer.spec; neprepisujeme ich v CLI)
         set +e
         python -m buildozer -v android debug 2>&1 | tee p4a_create.log
         status=${PIPESTATUS[0]}
