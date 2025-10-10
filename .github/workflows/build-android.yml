@@ -30,7 +30,8 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        sudo apt-get install -y --no-install-recommends python3-pip build-essential ffmpeg \
+        sudo apt-get install -y --no-install-recommends \
+          python3-pip build-essential cmake ninja-build ffmpeg \
           libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
           libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
           zlib1g-dev libgstreamer1.0 gstreamer1.0-plugins-base \
@@ -82,19 +83,13 @@ jobs:
         PATH: /usr/bin:/home/runner/.local/bin:/home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:/home/runner/.buildozer/android/platform/android-sdk/platform-tools:${PATH}
       run: |
         set -e
-        echo "Git:" && git --version
-        echo "sdkmanager at:" && which sdkmanager || true
-
-        # Workaround: Buildozer/p4a hľadá starú cestu tools/bin/sdkmanager -> vytvoríme symlink
+        git --version
+        which cmake && cmake --version
+        # Workaround pre starú cestu sdkmanager
         mkdir -p "${ANDROID_SDK_ROOT}/tools/bin"
         if [ ! -e "${ANDROID_SDK_ROOT}/tools/bin/sdkmanager" ]; then
           ln -s "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" "${ANDROID_SDK_ROOT}/tools/bin/sdkmanager"
         fi
-
-        # Overíme, že symlink funguje
-        "${ANDROID_SDK_ROOT}/tools/bin/sdkmanager" --version || true
-
-        # Spustíme build cez python -m (istota, že buildozer je nájdený)
         python -m buildozer -v android debug
 
     - name: Upload APK
