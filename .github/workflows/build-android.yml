@@ -38,6 +38,7 @@ jobs:
           ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
           libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
           nasm yasm rsync patchelf ccache \
+          libegl1-mesa-dev libgles2-mesa-dev libglu1-mesa-dev mesa-common-dev \
           openjdk-17-jdk unzip zip curl ca-certificates
 
     - name: Install Buildozer (pin Cython)
@@ -98,13 +99,16 @@ jobs:
           ln -s "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" "${ANDROID_SDK_ROOT}/tools/bin/sdkmanager"
         fi
 
-        # Build (requirements sa berú z buildozer.spec; neprepisujeme ich v CLI)
+        # Build (requirements sa berú z buildozer.spec)
         set +e
         python -m buildozer -v android debug 2>&1 | tee p4a_create.log
         status=${PIPESTATUS[0]}
         set -e
+        
         echo "==== tail p4a_create.log ===="
         tail -n 200 p4a_create.log || true
+        echo "==== try tail kivy build log ===="
+        find .buildozer -name "kivy*.log" -type f -print -exec tail -n 200 {} \; || true
         echo "=============================="
         exit ${status}
 
