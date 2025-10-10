@@ -31,11 +31,13 @@ jobs:
         DEBIAN_FRONTEND: noninteractive
       run: |
         sudo apt-get install -y --no-install-recommends \
-          python3-pip build-essential cmake ninja-build pkg-config \
-          libjpeg-dev libpng-dev libfreetype6-dev libffi-dev \
+          python3-pip python3-setuptools python3-wheel \
+          build-essential cmake ninja-build pkg-config m4 \
+          libjpeg-dev libpng-dev libfreetype6-dev libffi-dev zlib1g-dev \
+          libltdl-dev autoconf automake libtool gettext \
           ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
           libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
-          zlib1g-dev libgstreamer1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+          nasm yasm rsync patchelf ccache \
           openjdk-17-jdk unzip zip curl ca-certificates
 
     - name: Install Buildozer
@@ -61,7 +63,6 @@ jobs:
         export ANDROID_HOME="${LOCAL_SDK}"
         echo "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin" >> $GITHUB_PATH
         echo "${ANDROID_SDK_ROOT}/platform-tools" >> $GITHUB_PATH
-
         yes | "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" --licenses || true
         "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" \
           "platform-tools" \
@@ -84,26 +85,26 @@ jobs:
         PATH: /usr/bin:/home/runner/.local/bin:/home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:/home/runner/.buildozer/android/platform/android-sdk/platform-tools:${PATH}
       run: |
         set -e
-        git --version
-        which cmake && cmake --version
-        which pkg-config && pkg-config --version
-
+        echo "git: $(git --version)"
+        echo "cmake: $(cmake --version | head -n1)"
+        echo "pkg-config: $(pkg-config --version)"
         # Workaround pre starú cestu sdkmanager
         mkdir -p "${ANDROID_SDK_ROOT}/tools/bin"
         if [ ! -e "${ANDROID_SDK_ROOT}/tools/bin/sdkmanager" ]; then
           ln -s "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" "${ANDROID_SDK_ROOT}/tools/bin/sdkmanager"
         fi
-
-        # Spusti build s extra logmi
-        export P4A_DEBUG=1
-        python -m buildozer -v android debug || {
-          echo "========== Tail of .buildozer log =========="
-          tail -n 200 .buildozer/android/platform/build-arm64-v8a/build.log || true
-          echo "============================================"
-          exit 1
-        }
+        # Spusti build a ulož výstup
+        set +e
+        python -m buildozer -v android debug 2>&1 | tee p4a_create.log
+        status=${PIPESTATUS[0]}
+        set -e
+        echo "==== tail p4a_create.log ===="
+        tail -n 200 p4a_create.log || true
+        echo "=============================="
+        exit ${status}
 
     - name: Upload APK
+      if: success()
       uses: actions/upload-artifact@v4
       with:
         name: TwitchDropsMiner-debug
