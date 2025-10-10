@@ -84,6 +84,8 @@ jobs:
         ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
         ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
         PATH: /usr/bin:/home/runner/.local/bin:/home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:/home/runner/.buildozer/android/platform/android-sdk/platform-tools:${PATH}
+        USE_OPENGL_MOCK: 0
+        KIVY_GRAPHICS: gles
       run: |
         set -e
         echo "git: $(git --version)"
@@ -106,9 +108,9 @@ jobs:
         set -e
         
         echo "==== tail p4a_create.log ===="
-        tail -n 200 p4a_create.log || true
+        tail -n 300 p4a_create.log || true
         echo "==== try tail kivy build log ===="
-        find .buildozer -name "kivy*.log" -type f -print -exec tail -n 200 {} \; || true
+        find .buildozer -name "*.log" -path "*/kivy/*" -type f -print -exec tail -n 100 {} \; || true
         echo "=============================="
         exit ${status}
 
