@@ -1,55 +1,67 @@
 [app]
-# Základné informácie o aplikácii
-title = TwitchDropsMiner
+
+# (str) Title of your application
+title = Twitch Drops Miner
+
+# (str) Package name
 package.name = twitchdropsminer
-package.domain = org.tdm
 
-# Zdrojový kód
+# (str) Package domain (needed for android/ios packaging)
+package.domain = com.twitchdropsminer
+
+# (str) Source code where the main.py live
 source.dir = .
-source.include_exts = py,png,jpg,kv,atlas,txt
 
-# Verzovanie
-version = 1.0
+# (list) Source files to include (let empty to include all the files)
+source.include_exts = py,png,jpg,kv,atlas,json
 
-# Závislosti (vrátime Kivy 2.2.1 s p4a master)
-requirements = python3, kivy==2.2.1, requests, pillow, pyjnius==1.6.1, plyer, certifi
+# (str) Application versioning (method 1)
+version = 1.0.0
 
-# Orientácia a zobrazenie
+# (list) Application requirements
+# comma separated e.g. requirements = sqlite3,kivy
+requirements = python3,kivy==2.3.0,requests,pillow,pyjnius==1.6.1,plyer,certifi
+
+# (str) Supported orientation (landscape, sensorLandscape, portrait or all)
 orientation = portrait
+
+# (bool) Indicate if the application should be fullscreen or not
 fullscreen = 0
 
-# Android oprávnenia
+# (list) Permissions
 android.permissions = INTERNET,ACCESS_NETWORK_STATE,WAKE_LOCK
 
-# Android SDK/NDK/API
-android.api = 33
+# (int) Target Android API, should be as high as possible.
+android.api = 31
+
+# (int) Minimum API your APK will support.
 android.minapi = 21
+
+# (str) Android NDK version to use
 android.ndk = 25b
 
-# Buildozer/p4a nastavenia
+# (bool) Use --private data storage (True) or --dir public storage (False)
 android.private_storage = True
+
+# (str) Android logcat filters to use
 android.logcat_filters = *:S python:D
+
+# (bool) Copy library instead of making a libpymodules.so
 android.copy_libs = 1
 
-# Architektúry (pre rýchlejší a stabilnejší build najprv len 64-bit ARM)
-android.archs = arm64-v8a
-
-# Použijeme najnovší p4a master branch (má lepšie patche pre Kivy 2.2.x)
-p4a.branch = master
-
-# Voliteľné: ikona a presplash (ak máš súbory v projekte)
-# icon.filename = assets/icon.png
-# presplash.filename = assets/presplash.png
-
-# Voliteľné: ďalšie optimalizácie/kompat nastavenia
-# android.enable_androidx = True
-# android.allow_backup = False
-# android.prevent_scraping = True
+# (str) The Android arch to build for, choices: armeabi-v7a, arm64-v8a, x86, x86_64
+android.archs = arm64-v8a,armeabi-v7a
 
 [buildozer]
-# Verbózne logy pre ľahšie debugovanie na CI
+
+# (int) Log level (0 = error only, 1 = info, 2 = debug (with command output))
 log_level = 2
+
+# (int) Display warning if buildozer is run as root (0 = False, 1 = True)
 warn_on_root = 1
 
-# Ukladanie build artefaktov (necháme default, Buildozer si vytvorí .buildozer)
-# storage_dir = .buildozer
+# (str) Path to build artifact storage, absolute or relative to spec file
+build_dir = ./.buildozer
+
+# (str) Path to build output (i.e. .apk, .ipa) storage
+bin_dir = ./bin
