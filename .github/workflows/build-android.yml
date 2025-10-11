@@ -43,7 +43,9 @@ jobs:
           sudo mkdir -p $ANDROID_SDK_ROOT/cmdline-tools/latest
           sudo mv cmdline-tools/* $ANDROID_SDK_ROOT/cmdline-tools/latest/
           export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+          # akceptovať licencie (|| true pre prípad neinteraktívneho prostredia)
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_SDK_ROOT --licenses || true
+          # uprav verzie platform / build-tools / ndk podľa buildozer.spec ak treba
           $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_SDK_ROOT "platform-tools" "platforms;android-31" "build-tools;31.0.0" "ndk;21.4.7075529" || true
 
       - name: Create Python venv and install buildozer + p4a + cython
@@ -57,20 +59,47 @@ jobs:
         run: |
           set -euo pipefail
           . .venv/bin/activate
+          # buildozer môže skončiť ne-nulovým exit kódom; chceme vždy získať logy -> || true
           buildozer -v android debug 2>&1 | tee buildozer_output.log || true
 
-      - name: Collect and show logs (always)
+      - name: Show tail of buildozer output (quick peek)
         if: always()
         run: |
-          echo "=== buildozer_output.log ==="
-          sed -n '1,240p' buildozer_output.log || echo "No buildozer_output.log"
+          echo "=== buildozer_output.log (last 300 lines) ==="
+          tail -n 300 buildozer_output.log || true
+
+      - name: Collect and show .buildozer logs (first 200 lines each)
+        if: always()
+        run: |
           echo "=== .buildozer logs (first 200 lines each) ==="
           find .buildozer -type f -name "*.log" -exec echo "File: {}" \; -exec sed -n '1,200p' {} \; || true
 
-      - name: List APK files (debug)
+      - name: List APK files (before copy)
         run: |
-          echo "Listing all APK files in project:"
-          find . -type f -name "*.apk" || echo "No APK files found"
+          echo "Listing all APK files found (before copy):"
+          find . -type f -name "*.apk" -print || echo "No APK files found"
+
+      - name: Find and copy APKs into bin/ (so upload-artifact can find them)
+        run: |
+          set -euo pipefail
+          mkdir -p bin
+          echo "Searching for APKs..."
+          # create an array of found apks
+          mapfile -t apks < <(find . -type f -name "*.apk" -print)
+          if [ ${#apks[@]} -eq 0 ]; then
+            echo "No APK files found to copy."
+            exit 0
+          fi
+          i=0
+          for p in "${apks[@]}"; do
+            i=$((i+1))
+            fn=$(basename "$p")
+            # copy and prefix with index to avoid collisions
+            cp "$p" "bin/${i}_${fn}"
+            echo "Copied: $p -> bin/${i}_${fn}"
+          done
+          echo "Final bin/ contents:"
+          ls -la bin || true
 
       - name: Upload build logs
         if: always()
