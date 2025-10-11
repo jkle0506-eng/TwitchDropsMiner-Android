@@ -10,16 +10,25 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
-    
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
     - name: Install system dependencies
       run: |
         sudo apt-get update
@@ -50,52 +59,56 @@ jobs:
           libffi-dev \
           libssl-dev \
           openjdk-17-jdk
-    
-    - name: Set up Java
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-    
-    - name: Install Python dependencies
+
+    - name: Install Python build tools
       run: |
         python -m pip install --upgrade pip
         pip install --upgrade buildozer cython==0.29.36 virtualenv
-    
+
     - name: Cache Buildozer global directory
       uses: actions/cache@v4
       with:
         path: ~/.buildozer
         key: buildozer-${{ hashFiles('buildozer.spec') }}
-    
+
     - name: Cache Buildozer build directory
       uses: actions/cache@v4
       with:
         path: .buildozer
         key: buildozer-build-${{ hashFiles('buildozer.spec') }}-${{ hashFiles('requirements.txt') }}
-    
-    - name: Accept Android SDK licenses
+
+    - name: Accept Android SDK licenses and install required SDK packages
       run: |
+        # Try to accept licenses (some runner images already have sdkmanager)
         yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;30.0.3" "platforms;android-31" "ndk;25.2.9519653"
-    
+
+        # Install specific, CI-friendly versions (avoid build-tools 36.1 which prompts manual license acceptance)
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;30.0.3" "platforms;android-31" "ndk;25.2.9519653" || true
+
+        # Verify aidl exists
+        if [ ! -x "$ANDROID_HOME/build-tools/30.0.3/aidl" ] && [ ! -x "$ANDROID_HOME/build-tools/30.0.3/aidl" ]; then
+          echo "Warning: aidl not found under build-tools;30.0.3"
+          ls -la $ANDROID_HOME || true
+        fi
+
     - name: Build with Buildozer
       run: |
         buildozer android debug
       env:
-        ANDROID_HOME: /usr/local/lib/android/sdk
-    
+        ANDROID_HOME: ${{ env.ANDROID_HOME }}
+        ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: TwitchDropsMiner-debug
         path: bin/*.apk
         retention-days: 30
-    
+
     - name: Show build logs on failure
       if: failure()
       run: |
         echo "=== Buildozer log ==="
         cat .buildozer/android/platform/build-*/build.log || echo "No build.log found"
-        echo "=== P4A log ==="
-        find .buildozer -name "*.log" -exec echo "File: {}" \; -exec cat {} \;
+        echo "=== P4A / Kivy logs ==="
+        find .buildozer -name "*.log" -exec echo "File: {}" \; -exec sed -n '1,200p' {} \;
