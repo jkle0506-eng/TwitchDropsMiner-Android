@@ -42,15 +42,12 @@ jobs:
       run: |
         mkdir -p "${ANDROID_HOME}"
         cd "${ANDROID_HOME}"
-        # download commandline tools (version may be updated if necessary)
         wget -q https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip -O cmdline-tools.zip
         unzip -q cmdline-tools.zip -d cmdline-tools-tmp
         mkdir -p cmdline-tools/latest
-        # Some zips create a 'cmdline-tools' folder inside; move its contents to the expected path
         mv cmdline-tools-tmp/cmdline-tools/* cmdline-tools/latest/ || true
         rm -rf cmdline-tools.zip cmdline-tools-tmp
         export PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${PATH}"
-        # Install required SDK components (platforms, build-tools, platform-tools, ndk)
         yes | sdkmanager --sdk_root="${ANDROID_HOME}" --install "platform-tools" "platforms;android-30" "build-tools;30.0.3" "ndk;23.1.7779620" "cmake;3.10.2.4988404"
         yes | sdkmanager --sdk_root="${ANDROID_HOME}" --licenses || true
       shell: bash
@@ -86,7 +83,6 @@ jobs:
     - name: Build: clean previous state
       run: |
         source .venv/bin/activate
-        # ensure buildozer uses repo buildozer.spec
         buildozer --version || true
         buildozer android clean || true
       shell: bash
@@ -96,7 +92,6 @@ jobs:
       run: |
         set -x
         source .venv/bin/activate
-        # Verbose build, will produce buildozer_output.log
         buildozer -v android debug 2>&1 | tee buildozer_output.log
       shell: bash
       timeout-minutes: 90
