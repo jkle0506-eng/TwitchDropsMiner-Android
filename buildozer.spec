@@ -19,7 +19,6 @@ source.include_exts = py,png,jpg,kv,atlas,json
 version = 1.0.0
 
 # (list) Application requirements
-# comma separated e.g. requirements = sqlite3,kivy
 requirements = python3,kivy==2.3.0,requests,pillow,pyjnius==1.6.1,plyer,certifi
 
 # (str) Supported orientation (landscape, sensorLandscape, portrait or all)
@@ -39,6 +38,9 @@ android.minapi = 21
 
 # (str) Android NDK version to use
 android.ndk = 25b
+
+# (str) Android build tools version
+android.build_tools_version = 30.0.3
 
 # (bool) Use --private data storage (True) or --dir public storage (False)
 android.private_storage = True
