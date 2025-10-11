@@ -1,3 +1,117 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install Git explicitly
+      shell: bash
+      run: |
+        set -e
+        sudo apt-get update
+        sudo apt-get install -y git
+        git --version
+
+    - name: Install system dependencies
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo apt-get install -y --no-install-recommends \
+          python3-pip python3-setuptools python3-wheel \
+          build-essential cmake ninja-build pkg-config m4 \
+          libjpeg-dev libpng-dev libfreetype6-dev libffi-dev zlib1g-dev \
+          libltdl-dev autoconf automake libtool gettext \
+          ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
+          libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
+          nasm yasm rsync patchelf ccache \
+          libegl1-mesa-dev libgles2-mesa-dev libglu1-mesa-dev mesa-common-dev \
+          openjdk-17-jdk unzip zip curl ca-certificates
+
+    - name: Install Buildozer (pin Cython)
+      run: |
+        pip3 install --upgrade pip
+        pip3 install --user "cython==0.29.36" buildozer
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        python -m buildozer --version || true
+
+    - name: Prepare local Android SDK for Buildozer
+      shell: bash
+      run: |
+        set -e
+        export LOCAL_SDK="${HOME}/.buildozer/android/platform/android-sdk"
+        mkdir -p "${LOCAL_SDK}/cmdline-tools/latest"
+        if [ ! -x "${LOCAL_SDK}/cmdline-tools/latest/bin/sdkmanager" ]; then
+          cd /tmp
+          curl -sSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o clt.zip
+          unzip -q clt.zip
+          mv cmdline-tools/* "${LOCAL_SDK}/cmdline-tools/latest"/
+        fi
+        export ANDROID_SDK_ROOT="${LOCAL_SDK}"
+        export ANDROID_HOME="${LOCAL_SDK}"
+        echo "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin" >> $GITHUB_PATH
+        echo "${ANDROID_SDK_ROOT}/platform-tools" >> $GITHUB_PATH
+        yes | "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+        "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" \
+          "platform-tools" \
+          "build-tools;36.1.0" \
+          "platforms;android-33"
+
+    - name: Cache Buildozer
+      uses: actions/cache@v4
+      with:
+        path: |
+          .buildozer
+          ~/.buildozer
+        key: ${{ runner.os }}-buildozer-p4amaster-${{ hashFiles('buildozer.spec', 'requirements.txt') }}
+
+    - name: Clean old p4a if switching branches
+      run: |
+        rm -rf .buildozer/android/platform/python-for-android || true
+
+    - name: Build APK (allow failure to debug)
+      continue-on-error: true
+      id: build_attempt
+      shell: bash
+      env:
+        ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
+        ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
+        PATH: /usr/bin:/home/runner/.local/bin:/home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:/home/runner/.buildozer/android/platform/android-sdk/platform-tools:${PATH}
+        USE_OPENGL_MOCK: 0
+        KIVY_GRAPHICS: gles
+      run: |
+        set -e
+        echo "git: $(git --version)"
+        echo "cmake: $(cmake --version | head -n1)"
+        echo "pkg-config: $(pkg-config --version)"
+
+        mkdir -p "${ANDROID_SDK_ROOT}/tools/bin"
+        if [ ! -e "${ANDROID_SDK_ROOT}/tools/bin/sdkmanager" ]; then
+          ln -s "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" "${ANDROID_SDK_ROOT}/tools/bin/sdkmanager"
+        fi
+
+        set +e
+        python -m buildozer -v android debug 2>&1 | tee p4a_create.log
+        status=${PIPESTATUS[0]}
+        set -e
+        
+        echo "==== tail p4a_create.log ===="
+        tail -n 300 p4a_create.log || true
+        exit ${status}
+
     - name: Debug Kivy build manually
       if: steps.build_attempt.outcome == 'failure'
       shell: bash
@@ -20,12 +134,16 @@
           
           echo "==== Installing setuptools into hostpython ===="
           "$HOSTPYTHON" -m ensurepip || true
-          "$HOSTPYTHON" -m pip install --upgrade pip setuptools wheel || true
+          "$HOSTPYTHON" -m pip install --upgrade pip setuptools wheel cython || true
           
           echo "==== Verifying setuptools ===="
           "$HOSTPYTHON" -c "import setuptools; print('setuptools version:', setuptools.__version__)"
+          "$HOSTPYTHON" -c "import Cython; print('Cython version:', Cython.__version__)" || true
           
           cd "$KIVY_DIR"
+          
+          echo "==== Kivy directory contents ===="
+          ls -la
           
           echo "==== Running setup.py build_ext manually with full env ===="
           export NDKPLATFORM='NOTNONE'
@@ -39,14 +157,29 @@
           
           echo "==== Manual build exit code: $BUILD_STATUS ===="
           if [ $BUILD_STATUS -eq 0 ]; then
-            echo "SUCCESS! Kivy built successfully. The issue was missing setuptools in hostpython."
+            echo "✅ SUCCESS! Kivy built successfully. The issue was missing setuptools in hostpython."
             echo "Now we need to fix the main build process to install setuptools before Kivy build."
           else
-            echo "==== Manual build output (last 300 lines) ===="
+            echo "❌ Manual build failed. Output (last 300 lines):"
             tail -n 300 /tmp/kivy_manual_build.log
           fi
         else
           echo "ERROR: Could not find Kivy setup.py or hostpython"
+          echo "==== Directory structure ===="
+          find "$WORKSPACE/.buildozer/android/platform/build-"* -maxdepth 5 -type d 2>/dev/null | head -n 50
         fi
         
+        echo "==== All log files in build ===="
+        find "$WORKSPACE/.buildozer" -name "*.log" -type f 2>/dev/null | head -n 20 | while read logfile; do
+          echo "=== $logfile ==="
+          tail -n 30 "$logfile"
+        done
+        
         exit 1
+
+    - name: Upload APK
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: TwitchDropsMiner-debug
+        path: bin/*.apk
