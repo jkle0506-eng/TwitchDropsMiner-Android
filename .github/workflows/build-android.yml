@@ -55,11 +55,19 @@ jobs:
           pip install --upgrade pip setuptools wheel
           pip install cython==0.29.33 buildozer==1.5.0 python-for-android==2024.1.21
 
+      - name: Show Python & pip info
+        run: |
+          . .venv/bin/activate
+          python -V
+          which python
+          pip -V
+          pip list
+
       - name: Run buildozer (build) and capture logs
         run: |
           set -euo pipefail
           . .venv/bin/activate
-          # buildozer môže skončiť ne-nulovým exit kódom; chceme vždy získať logy -> || true
+          # buildozer môže skončiť s non-zero -> chceme logy -> preto || true
           buildozer -v android debug 2>&1 | tee buildozer_output.log || true
 
       - name: Show tail of buildozer output (quick peek)
@@ -74,6 +82,23 @@ jobs:
           echo "=== .buildozer logs (first 200 lines each) ==="
           find .buildozer -type f -name "*.log" -exec echo "File: {}" \; -exec sed -n '1,200p' {} \; || true
 
+      - name: List build output directories (debug)
+        if: always()
+        run: |
+          echo "Listing possible build output dirs:"
+          ls -la .buildozer || true
+          ls -la .buildozer/android || true
+          ls -la .buildozer/android/platform || true
+          ls -la .buildozer/android/platform/build-* || true
+          echo "Recursive listing of outputs dirs (if exist):"
+          for d in .buildozer/android/platform/build-* ; do
+            if [ -d "$d" ]; then
+              echo "==== $d ===="
+              ls -la "$d" || true
+              ls -la "$d"/outputs || true
+            fi
+          done || true
+
       - name: List APK files (before copy)
         run: |
           echo "Listing all APK files found (before copy):"
@@ -84,22 +109,20 @@ jobs:
           set -euo pipefail
           mkdir -p bin
           echo "Searching for APKs..."
-          # create an array of found apks
           mapfile -t apks < <(find . -type f -name "*.apk" -print)
           if [ ${#apks[@]} -eq 0 ]; then
             echo "No APK files found to copy."
-            exit 0
+          else
+            i=0
+            for p in "${apks[@]}"; do
+              i=$((i+1))
+              fn=$(basename "$p")
+              cp "$p" "bin/${i}_${fn}"
+              echo "Copied: $p -> bin/${i}_${fn}"
+            done
+            echo "Final bin/ contents:"
+            ls -la bin || true
           fi
-          i=0
-          for p in "${apks[@]}"; do
-            i=$((i+1))
-            fn=$(basename "$p")
-            # copy and prefix with index to avoid collisions
-            cp "$p" "bin/${i}_${fn}"
-            echo "Copied: $p -> bin/${i}_${fn}"
-          done
-          echo "Final bin/ contents:"
-          ls -la bin || true
 
       - name: Upload build logs
         if: always()
