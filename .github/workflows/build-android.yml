@@ -67,6 +67,11 @@ jobs:
           echo "=== .buildozer logs (first 200 lines each) ==="
           find .buildozer -type f -name "*.log" -exec echo "File: {}" \; -exec sed -n '1,200p' {} \; || true
 
+      - name: List APK files (debug)
+        run: |
+          echo "Listing all APK files in project:"
+          find . -type f -name "*.apk" || echo "No APK files found"
+
       - name: Upload build logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -84,3 +89,4 @@ jobs:
           path: |
             bin/*.apk
             ./.buildozer/android/platform/build-*/outputs/**/*.apk
+            ./.buildozer/android/platform/build-*/outputs/apk/**/*.apk
