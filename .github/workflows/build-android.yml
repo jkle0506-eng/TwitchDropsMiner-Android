@@ -2,9 +2,9 @@ name: Build TwitchDropsMiner APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -18,146 +18,147 @@ jobs:
       JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Use Python 3.10
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
+      - name: Use Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-    - name: Install system packages
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends \
-          build-essential git wget unzip zip curl ca-certificates \
-          python3-dev python3-venv python3-pip pkg-config \
-          libffi-dev libssl-dev libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libglu1-mesa-dev \
-          cmake ninja-build libtool automake autoconf \
-          openjdk-11-jdk
-        sudo update-alternatives --set java /usr/lib/jvm/java-11-openjdk-amd64/bin/java
-        python3 -m pip install --upgrade pip setuptools wheel
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential git wget unzip zip curl ca-certificates \
+            python3-dev python3-venv python3-pip pkg-config \
+            libffi-dev libssl-dev libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libglu1-mesa-dev \
+            cmake ninja-build libtool automake autoconf \
+            openjdk-11-jdk
+          sudo update-alternatives --set java /usr/lib/jvm/java-11-openjdk-amd64/bin/java
+          python3 -m pip install --upgrade pip setuptools wheel
+        shell: bash
 
-    - name: Setup Android SDK cmdline-tools
-      run: |
-        mkdir -p "${ANDROID_HOME}"
-        cd "${ANDROID_HOME}"
-        wget -q https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip -O cmdline-tools.zip
-        unzip -q cmdline-tools.zip -d cmdline-tools-tmp
-        mkdir -p cmdline-tools/latest
-        mv cmdline-tools-tmp/cmdline-tools/* cmdline-tools/latest/ || true
-        rm -rf cmdline-tools.zip cmdline-tools-tmp
-        export PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${PATH}"
-        yes | sdkmanager --sdk_root="${ANDROID_HOME}" --install "platform-tools" "platforms;android-30" "build-tools;30.0.3" "ndk;23.1.7779620" "cmake;3.10.2.4988404"
-        yes | sdkmanager --sdk_root="${ANDROID_HOME}" --licenses || true
-      shell: bash
+      - name: Setup Android SDK cmdline-tools
+        run: |
+          mkdir -p "${ANDROID_HOME}"
+          cd "${ANDROID_HOME}"
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip -O cmdline-tools.zip
+          unzip -q cmdline-tools.zip -d cmdline-tools-tmp
+          mkdir -p cmdline-tools/latest
+          mv cmdline-tools-tmp/cmdline-tools/* cmdline-tools/latest/ || true
+          rm -rf cmdline-tools.zip cmdline-tools-tmp
+          export PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${PATH}"
+          yes | sdkmanager --sdk_root="${ANDROID_HOME}" --install "platform-tools" "platforms;android-30" "build-tools;30.0.3" "ndk;23.1.7779620" "cmake;3.10.2.4988404"
+          yes | sdkmanager --sdk_root="${ANDROID_HOME}" --licenses || true
+        shell: bash
 
-    - name: Cache pip and .buildozer
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/pip
-          ./.buildozer/android/platform
-        key: ${{ runner.os }}-pypi-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pypi-
+      - name: Cache pip and .buildozer
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ./.buildozer/android/platform
+          key: ${{ runner.os }}-pypi-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pypi-
 
-    - name: Create and activate virtualenv
-      run: |
-        python3 -m venv .venv
-        source .venv/bin/activate
-        pip install --upgrade pip
-        pip install buildozer cython
-        pip install --upgrade python-for-android
-      shell: bash
+      - name: Create and activate virtualenv
+        run: |
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install buildozer cython
+          pip install --upgrade python-for-android
+        shell: bash
 
-    - name: Print environment (debug)
-      run: |
-        echo "ANDROID_HOME=${ANDROID_HOME}"
-        echo "JAVA_HOME=${JAVA_HOME}"
-        java -version || true
-        python -V
-        .venv/bin/python -m pip freeze | sed -n '1,200p' || true
-      shell: bash
+      - name: Print environment (debug)
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME}"
+          echo "JAVA_HOME=${JAVA_HOME}"
+          java -version || true
+          python -V
+          .venv/bin/python -m pip freeze | sed -n '1,200p' || true
+        shell: bash
 
-    - name: Build: clean previous state
-      run: |
-        source .venv/bin/activate
-        buildozer --version || true
-        buildozer android clean || true
-      shell: bash
-      continue-on-error: true
+      - name: Build: clean previous state
+        run: |
+          source .venv/bin/activate
+          buildozer --version || true
+          buildozer android clean || true
+        shell: bash
+        continue-on-error: true
 
-    - name: Build: run Buildozer (debug)
-      run: |
-        set -x
-        source .venv/bin/activate
-        buildozer -v android debug 2>&1 | tee buildozer_output.log
-      shell: bash
-      timeout-minutes: 90
+      - name: Build: run Buildozer (debug)
+        run: |
+          set -x
+          source .venv/bin/activate
+          buildozer -v android debug 2>&1 | tee buildozer_output.log
+        shell: bash
+        timeout-minutes: 90
 
-    - name: Collect combined logs
-      if: always()
-      run: |
-        echo "==== tail buildozer_output.log ====" > combined_logs.txt
-        if [ -f buildozer_output.log ]; then
-          tail -n 2000 buildozer_output.log >> combined_logs.txt || true
-        fi
-        if [ -d .buildozer ]; then
-          find .buildozer -type f \( -iname "*.log" -o -iname "*.txt" -o -iname "*.out" \) -print0 | while IFS= read -r -d '' f; do
-            echo "==== FILE: $f ====" >> combined_logs.txt
-            sed -n '1,500p' "$f" >> combined_logs.txt || true
-            echo >> combined_logs.txt
-          done
-        fi
-        echo "==== Listing possible outputs ====" >> combined_logs.txt
-        ls -la bin || true >> combined_logs.txt 2>&1
-        for d in .buildozer/android/platform/build-* ; do
-          if [ -d "$d" ]; then
-            echo "==== DIR: $d ====" >> combined_logs.txt
-            ls -la "$d" || true >> combined_logs.txt 2>&1
-            ls -la "$d"/outputs || true >> combined_logs.txt 2>&1
+      - name: Collect combined logs
+        if: always()
+        run: |
+          echo "==== tail buildozer_output.log ====" > combined_logs.txt
+          if [ -f buildozer_output.log ]; then
+            tail -n 2000 buildozer_output.log >> combined_logs.txt || true
           fi
-        done || true
-        zip -r build_debug_combined.zip combined_logs.txt || true
-      shell: bash
+          if [ -d .buildozer ]; then
+            find .buildozer -type f \( -iname "*.log" -o -iname "*.txt" -o -iname "*.out" \) -print0 | while IFS= read -r -d '' f; do
+              echo "==== FILE: $f ====" >> combined_logs.txt
+              sed -n '1,500p' "$f" >> combined_logs.txt || true
+              echo >> combined_logs.txt
+            done
+          fi
+          echo "==== Listing possible outputs ====" >> combined_logs.txt
+          ls -la bin || true >> combined_logs.txt 2>&1
+          for d in .buildozer/android/platform/build-* ; do
+            if [ -d "$d" ]; then
+              echo "==== DIR: $d ====" >> combined_logs.txt
+              ls -la "$d" || true >> combined_logs.txt 2>&1
+              ls -la "$d"/outputs || true >> combined_logs.txt 2>&1
+            fi
+          done || true
+          zip -r build_debug_combined.zip combined_logs.txt || true
+        shell: bash
 
-    - name: Upload combined build logs
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-debug-combined
-        path: build_debug_combined.zip
+      - name: Upload combined build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-debug-combined
+          path: build_debug_combined.zip
 
-    - name: Find and copy APKs into bin/
-      if: always()
-      run: |
-        set -euo pipefail
-        mkdir -p bin
-        echo "Searching for APKs..."
-        mapfile -t apks < <(find . -type f -name "*.apk" -print)
-        if [ ${#apks[@]} -eq 0 ]; then
-          echo "No APK files found to copy."
-        else
-          i=0
-          for p in "${apks[@]}"; do
-            i=$((i+1))
-            fn=$(basename "$p")
-            cp "$p" "bin/${i}_${fn}"
-            echo "Copied: $p -> bin/${i}_${fn}"
-          done
-          echo "Final bin/ contents:"
-          ls -la bin || true
-        fi
-      shell: bash
+      - name: Find and copy APKs into bin/
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p bin
+          echo "Searching for APKs..."
+          mapfile -t apks < <(find . -type f -name "*.apk" -print)
+          if [ ${#apks[@]} -eq 0 ]; then
+            echo "No APK files found to copy."
+          else
+            i=0
+            for p in "${apks[@]}"; do
+              i=$((i+1))
+              fn=$(basename "$p")
+              cp "$p" "bin/${i}_${fn}"
+              echo "Copied: $p -> bin/${i}_${fn}"
+            done
+            echo "Final bin/ contents:"
+            ls -la bin || true
+          fi
+        shell: bash
 
-    - name: Upload APK (if created)
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: apk
-        path: |
-          bin/*.apk
-          ./.buildozer/android/platform/build-*/outputs/**/*.apk
-          ./.buildozer/android/platform/build-*/outputs/apk/**/*.apk
-        if-no-files-found: warn
+      - name: Upload APK (if created)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: |
+            bin/*.apk
+            ./.buildozer/android/platform/build-*/outputs/**/*.apk
+            ./.buildozer/android/platform/build-*/outputs/apk/**/*.apk
+          if-no-files-found: warn
